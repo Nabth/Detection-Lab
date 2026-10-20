@@ -1,2 +1,2 @@
 # soc-detection-lab
-Wazuh + Suricata + DVWA
+Wazuh + Suricata + Coraza + DVWA
