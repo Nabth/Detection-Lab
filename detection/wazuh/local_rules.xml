@@ -4,16 +4,13 @@
 
 <!-- Example -->
 <group name="local,syslog,sshd,">
-  <!--
-  Dec 10 01:02:02 host sshd[1234]: Failed none for root from 1.1.1.1 port 1066 ssh2
-  -->
   <rule id="100001" level="5">
     <if_sid>5716</if_sid>
     <srcip>1.1.1.1</srcip>
     <description>sshd: authentication failed from IP 1.1.1.1.</description>
     <group>authentication_failed,pci_dss_10.2.4,pci_dss_10.2.5,</group>
   </rule>
-</group> <!-- ЗАКРЫЛИ ГРУППУ sshd -->
+</group>
 
 <group name="coraza,waf,">
   <!-- Базовое правило для сбора всех логов Coraza (не создает алертов, чтобы не спамить) -->
@@ -30,7 +27,7 @@
     <field name="transaction.is_interrupted">true</field>
     <description>Coraza WAF: Attack blocked from $(transaction.client_ip) on $(transaction.request.uri)</description>
     <mitre>
-      <id>T1190</id> <!-- Exploit Public-Facing Application -->
+      <id>T1190</id>
     </mitre>
     <group>attack,web_attack,</group>
   </rule>
@@ -41,8 +38,55 @@
     <regex>SQL Injection Attack Detected</regex>
     <description>Coraza WAF: SQL Injection blocked from $(transaction.client_ip)</description>
     <mitre>
-      <id>T1190</id> <!-- Exploit Public-Facing Application -->
+      <id>T1190</id>
     </mitre>
     <group>attack,sql_injection,</group>
+  </rule>
+</group>
+
+<group name="suricata,ddos,active_response,">
+  <!-- SYN Flood -->
+  <rule id="100200" level="10">
+    <if_sid>86601</if_sid>
+    <field name="alert.signature_id" type="pcre2">1000001</field>
+    <description>Suricata: Custom SYN Flood detected. Initiating Active Response.</description>
+    <mitre><id>T1498.001</id></mitre>
+    <group>ddos,syn_flood,</group>
+  </rule>
+
+  <!-- UDP Flood -->
+  <rule id="100201" level="10">
+    <if_sid>86601</if_sid>
+    <field name="alert.signature_id" type="pcre2">1000002</field>
+    <description>Suricata: Custom UDP Flood detected. Initiating Active Response.</description>
+    <mitre><id>T1498.002</id></mitre>
+    <group>ddos,udp_flood,</group>
+  </rule>
+
+  <!-- Nginx HTTP Flood (429 Too Many Requests) -->
+  <rule id="100300" level="8">
+    <if_sid>31101</if_sid> <!-- Базовое правило Wazuh для веб-логов -->
+    <id>429</id> <!-- HTTP status code -->
+    <description>Nginx: HTTP Flood detected (429 Too Many Requests) from $(srcip)</description>
+    <mitre><id>T1498.001</id></mitre>
+    <group>web_attack,ddos,</group>
+  </rule>
+
+  <!-- TCP Flag Anomaly Scan (XMAS/NULL/FIN) -->
+  <rule id="100202" level="10">
+    <if_sid>86601</if_sid>
+    <regex>CUSTOM TCP Flag Anomaly Scan</regex>
+    <description>Suricata: TCP Flag Anomaly Scan (XMAS/NULL/FIN). Blocking scanner.</description>
+    <mitre><id>T1046</id></mitre>
+    <group>scan,tcp_anomaly,</group>
+  </rule>
+
+  <!-- Общие сканирования (Nmap) -->
+  <rule id="100203" level="7">
+    <if_sid>86601</if_sid>
+    <regex>ET SCAN</regex>
+    <description>Suricata: Port Scan detected. Temporary block.</description>
+    <mitre><id>T1046</id></mitre>
+    <group>scan,port_scan,</group>
   </rule>
 </group>
