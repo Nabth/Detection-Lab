@@ -111,3 +111,8 @@ docker-compose.override.yml
 
 # Wazuh local copies
 hosts/wazuh-server/wazuh/manager/client.keys
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
