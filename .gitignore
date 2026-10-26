@@ -92,3 +92,22 @@ desktop.ini
 *.swp
 *.swo
 *~
+
+# ============================================================
+# Project-specific ignores (v1.0 restructure)
+# ============================================================
+
+# WAF certificates (never commit private keys)
+hosts/victim/waf-coraza/certs/
+*.pem
+*.key
+
+# Testing results
+testing/results/*
+!testing/results/.gitkeep
+
+# Docker overrides
+docker-compose.override.yml
+
+# Wazuh local copies
+hosts/wazuh-server/wazuh/manager/client.keys
