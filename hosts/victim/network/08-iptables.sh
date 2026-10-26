@@ -31,6 +31,26 @@ sudo iptables -A INPUT -p tcp --tcp-flags ALL NONE -j DROP
 sudo iptables -A INPUT -p tcp --tcp-flags ALL ALL -j DROP
 sudo iptables -A INPUT -p tcp --tcp-flags ALL FIN -j DROP
 
+echo "[*] Applying TCP handshake and flood protections..."
+# ACK/RST Flood
+sudo iptables -N ACK_FLOOD 2>/dev/null || true
+sudo iptables -I INPUT 3 -p tcp --tcp-flags ACK ACK -j ACK_FLOOD
+sudo iptables -A ACK_FLOOD -m hashlimit --hashlimit-name ack_limit --hashlimit-upto 100/sec --hashlimit-burst 200 --hashlimit-mode srcip --hashlimit-srcmask 32 -j RETURN
+sudo iptables -A ACK_FLOOD -j DROP
+
+sudo iptables -N RST_FLOOD 2>/dev/null || true
+sudo iptables -I INPUT 3 -p tcp --tcp-flags RST RST -j RST_FLOOD
+sudo iptables -A RST_FLOOD -m hashlimit --hashlimit-name rst_limit --hashlimit-upto 100/sec --hashlimit-burst 200 --hashlimit-mode srcip --hashlimit-srcmask 32 -j RETURN
+sudo iptables -A RST_FLOOD -j DROP
+
+# Невалидные флаги
+sudo iptables -I INPUT 3 -p tcp --tcp-flags SYN,FIN SYN,FIN -j DROP
+sudo iptables -I INPUT 3 -p tcp --tcp-flags SYN,RST SYN,RST -j DROP
+sudo iptables -I INPUT 3 -p tcp --tcp-flags PSH,ACK PSH -j DROP
+
+# LAND Attack
+sudo iptables -I INPUT 3 -s 192.168.56.20 -d 192.168.56.20 -j DROP
+
 echo "[*] Restarting Docker to restore its iptables chains..."
 sudo systemctl restart docker
 
