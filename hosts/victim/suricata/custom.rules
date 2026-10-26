@@ -1,4 +1,8 @@
-# SYN Flood (stateful, нужна проверка потока)
+# ============================================================
+# L3/L4 Flood Detection Rules
+# ============================================================
+
+# SYN Flood (stateful, требует установки соединения)
 alert tcp any any -> $HOME_NET any (msg:"CUSTOM Possible SYN Flood"; flags:S; threshold: type both, track by_src, count 200, seconds 5; classtype:attempted-dos; sid:1000001; rev:6;)
 
 # UDP Flood (stateful)
@@ -7,11 +11,34 @@ alert udp any any -> $HOME_NET any (msg:"CUSTOM Possible UDP Flood"; threshold: 
 # ICMP Flood (stateful)
 alert icmp any any -> $HOME_NET any (msg:"CUSTOM ICMP Flood Detected"; itype:8; threshold: type both, track by_src, count 50, seconds 5; classtype:attempted-dos; sid:1000009; rev:1;)
 
-# XMAS Scan (stateless)
-alert tcp any any -> $HOME_NET any (msg:"CUSTOM TCP Flag Anomaly Scan (XMAS)"; flow:stateless; flags:FPU; threshold: type both, track by_src, count 10, seconds 10; classtype:attempted-recon; sid:1000003; rev:7;)
+# ACK Flood (stateful)
+alert tcp any any -> $HOME_NET any (msg:"CUSTOM Possible ACK Flood"; flags:A; threshold: type both, track by_src, count 200, seconds 5; classtype:attempted-dos; sid:1000010; rev:1;)
 
-# NULL Scan (stateless)
-alert tcp any any -> $HOME_NET any (msg:"CUSTOM TCP Flag Anomaly Scan (NULL)"; flags:!S; flow:stateless; threshold: type both, track by_src, count 5, seconds 10; classtype:attempted-recon; sid:1000004; rev:3;)
+# RST Flood (stateful)
+alert tcp any any -> $HOME_NET any (msg:"CUSTOM Possible RST Flood"; flags:R; threshold: type both, track by_src, count 200, seconds 5; classtype:attempted-dos; sid:1000011; rev:1;)
 
-# FIN Scan (stateless)
-alert tcp any any -> $HOME_NET any (msg:"CUSTOM TCP Flag Anomaly Scan (FIN)"; flow:stateless; flags:F; threshold: type both, track by_src, count 5, seconds 10; classtype:attempted-recon; sid:1000005; rev:2;)
+# ============================================================
+# L3/L4 Scan Detection Rules (stateless)
+# ============================================================
+
+# XMAS Scan (FIN+PSH+URG)
+alert tcp any any -> $HOME_NET any (msg:"CUSTOM TCP Flag Anomaly Scan (XMAS)"; flow:stateless; flags:FPU; threshold: type both, track by_src, count 5, seconds 10; classtype:attempted-recon; sid:1000003; rev:8;)
+
+# NULL Scan (no flags set) — detection_filter для stateless
+alert tcp any any -> $HOME_NET any (msg:"CUSTOM TCP Flag Anomaly Scan (NULL)"; flow:stateless; flags:0,12; detection_filter: track by_src, count 5, seconds 10; classtype:attempted-recon; sid:1000004; rev:9;)
+
+# FIN Scan (only FIN flag)
+alert tcp any any -> $HOME_NET any (msg:"CUSTOM TCP Flag Anomaly Scan (FIN)"; flow:stateless; flags:F; threshold: type both, track by_src, count 5, seconds 10; classtype:attempted-recon; sid:1000005; rev:3;)
+
+# ============================================================
+# L3/L4 Anomaly Detection (stateless)
+# ============================================================
+
+# LAND Attack (source IP = destination IP)
+alert ip 192.168.56.20 any -> 192.168.56.20 any (msg:"CUSTOM LAND Attack Detected"; classtype:attempted-dos; sid:1000012; rev:1;)
+
+# Invalid flags: SYN+FIN (used in evasion)
+alert tcp any any -> $HOME_NET any (msg:"CUSTOM Invalid TCP flags SYN+FIN"; flow:stateless; flags:SF; classtype:bad-unknown; sid:1000013; rev:1;)
+
+# Invalid flags: SYN+RST
+alert tcp any any -> $HOME_NET any (msg:"CUSTOM Invalid TCP flags SYN+RST"; flow:stateless; flags:SR; classtype:bad-unknown; sid:1000014; rev:1;)
