@@ -11,6 +11,19 @@ echo "[*] Flushing old iptables rules..."
 sudo iptables -F
 sudo iptables -X
 
+# === БАЗОВЫЕ ПРАВИЛА (чтобы не отрубить SSH и не потерять установленные соединения) ===
+echo "[*] Applying baseline rules..."
+sudo iptables -P INPUT DROP
+sudo iptables -P FORWARD DROP
+sudo iptables -P OUTPUT ACCEPT
+
+# Разрешаем локальные соединения (loopback)
+sudo iptables -A INPUT -i lo -j ACCEPT
+# Разрешаем уже установленные соединения
+sudo iptables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+# Разрешаем SSH
+sudo iptables -A INPUT -p tcp --dport 22 -j ACCEPT
+
 echo "[*] Applying ICMP flood protection..."
 sudo iptables -N ICMP_FLOOD
 sudo iptables -I INPUT 1 -p icmp --icmp-type echo-request -j ICMP_FLOOD

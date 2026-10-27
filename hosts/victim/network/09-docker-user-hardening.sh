@@ -9,6 +9,7 @@ set -euo pipefail
 
 echo "[*] Applying DOCKER-USER rules..."
 sudo iptables -F DOCKER-USER 2>/dev/null || true
+
 sudo iptables -A DOCKER-USER -m conntrack --ctstate ESTABLISHED,RELATED -j RETURN
 sudo iptables -A DOCKER-USER -p tcp --dport 443 -j RETURN
 sudo iptables -A DOCKER-USER -p tcp --dport 80 -j RETURN
