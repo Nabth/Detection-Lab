@@ -1,0 +1,19 @@
+<!-- Local Decoders -->
+<!-- Modify it at your will. -->
+<!-- Copyright (C) 2015, Wazuh Inc. -->
+
+<!-- Decoder for JSON logs (Suricata / Coraza) -->
+<decoder name="json">
+    <prematch>^{\s*"</prematch>
+</decoder>
+
+<decoder name="json_child">
+    <parent>json</parent>
+    <regex type="pcre2">"src_ip":"([^"]+)"</regex>
+    <order>srcip</order>
+</decoder>
+
+<decoder name="json_child">
+    <parent>json</parent>
+    <plugin_decoder offset="after_parent">JSON_Decoder</plugin_decoder>
+</decoder>

@@ -48,8 +48,8 @@
 <group name="nginx,web,">
   <!-- База: Ловим POST-запросы к login.php (привязка к SID 31141) -->
   <rule id="100102" level="3">
-    <!-- Привязываемся к базовым правилам веб-логов: 31100 (любой запрос), 31101 (4xx), 31141 (499) -->
-    <if_sid>31100,31101,31141</if_sid> 
+    <!-- Привязываемся ко всем базовым правилам веб-логов (2xx, 3xx, 4xx, 5xx, 499) -->
+    <if_sid>31100,31101,31102,31108,31141</if_sid> 
     <match>login.php</match>
     <description>DVWA: Login page request</description>
   </rule>
