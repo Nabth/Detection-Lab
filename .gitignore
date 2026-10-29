@@ -140,3 +140,4 @@ modsec_audit.log
 reports/raw/
 reports/*/raw/
 reports/sqlmap/
+.env
