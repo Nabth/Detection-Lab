@@ -120,7 +120,6 @@ __pycache__/
 # --- Secrets (CRITICAL) ---
 .env
 .env.*
-!.env.example
 *.pem
 *.key
 *.p12
@@ -140,4 +139,3 @@ modsec_audit.log
 reports/raw/
 reports/*/raw/
 reports/sqlmap/
-.env
