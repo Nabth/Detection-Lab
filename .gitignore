@@ -116,3 +116,27 @@ hosts/wazuh-server/wazuh/manager/client.keys
 __pycache__/
 *.py[cod]
 .pytest_cache/
+
+# --- Secrets (CRITICAL) ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+
+# --- Certs (generated) ---
+hosts/victim/waf-coraza/certs/*.pem
+hosts/victim/waf-coraza/certs/*.key
+
+# --- Logs ---
+eve.json
+fast.log
+alerts.json
+modsec_audit.log
+
+# --- Reports (raw) ---
+reports/raw/
+reports/*/raw/
+reports/sqlmap/
