@@ -76,6 +76,10 @@ AR_RULES = {
     "100204", "100205", "100206", "100207", "100300",
 }
 
+AR_TIMEOUTS = {
+    "100203": 300,   # recon — 5 min
+    # все остальные из AR_RULES — 600s по умолчанию
+}
 
 def classify(a):
     r = a.get("rule", {}) or {}
@@ -154,7 +158,8 @@ def format_alert(a):
     ]
 
     if rule_id in AR_RULES or "active_response" in groups:
-        lines.append("🔧 Active Response: IP banned for 600s")
+        timeout = AR_TIMEOUTS.get(rule_id, 600)
+        lines.append(f"🔧 Active Response: IP banned for {timeout}s")
     elif "429" in desc:
         lines.append("🔧 Rate limited (429)")
 

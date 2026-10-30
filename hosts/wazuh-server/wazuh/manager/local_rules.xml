@@ -2,15 +2,6 @@
 <!-- Modify it at your will. -->
 <!-- Copyright (C) 2015, Wazuh Inc. -->
 
-<group name="local,syslog,sshd,">
-  <rule id="100001" level="5">
-    <if_sid>5716</if_sid>
-    <srcip>1.1.1.1</srcip>
-    <description>sshd: authentication failed from IP 1.1.1.1.</description>
-    <group>authentication_failed,pci_dss_10.2.4,pci_dss_10.2.5,</group>
-  </rule>
-</group>
-
 <!-- ================================================================== -->
 <!-- GROUP: Coraza WAF (L7 Web Application Firewall)                    -->
 <!-- ================================================================== -->
@@ -64,7 +55,7 @@
   </rule>
 
   <!-- Nginx HTTP Flood (429 Too Many Requests) -->
-<rule id="100300" level="8">
+<rule id="100300" level="10">
     <if_sid>31101</if_sid>
     <id>429</id>
     <description>Nginx: HTTP Flood detected (429 Too Many Requests) from $(srcip)</description>
