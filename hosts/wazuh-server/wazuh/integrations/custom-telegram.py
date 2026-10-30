@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """
 SOC Lab notifier — Wazuh Integration for Telegram.
-Uses standard requests library for stable SSL/TLS connections.
+Includes Alert Deduplication and filters out Active Response confirmations.
 """
 import json
 import os
 import re
 import sys
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -70,6 +71,34 @@ AR_TIMEOUTS = {
     "100203": 300,
 }
 
+# --- Anti-Spam Cache ---
+CACHE_FILE = Path("/tmp/wazuh_tg_cache.json")
+COOLDOWN = 300  # 5 minutes
+
+def is_spam(kind, srcip):
+    if not CACHE_FILE.exists():
+        CACHE_FILE.write_text("{}")
+    try:
+        cache = json.loads(CACHE_FILE.read_text())
+    except Exception:
+        cache = {}
+        
+    key = f"{kind}:{srcip}"
+    now = time.time()
+    
+    if key in cache and (now - cache[key]) < COOLDOWN:
+        return True
+        
+    cache[key] = now
+    cache = {k: v for k, v in cache.items() if now - v < COOLDOWN}
+    
+    try:
+        CACHE_FILE.write_text(json.dumps(cache))
+    except Exception:
+        pass
+    return False
+
+# --- logic ---
 def classify(a):
     r = a.get("rule", {}) or {}
     g = [x.lower() for x in r.get("groups", [])]
@@ -98,7 +127,17 @@ def extract_src_ip(a):
     al = d.get("alert") or {}
     if al.get("src_ip"):
         return str(al["src_ip"])
-    m = re.search(r"(\d{1,3}(?:\.\d{1,3}){3})", a.get("full_log", ""))
+    
+    full_log = a.get("full_log", "")
+    m = re.search(r'"src_ip":"(\d{1,3}(?:\.\d{1,3}){3})"', full_log)
+    if m:
+        return m.group(1)
+        
+    m = re.search(r'client:\s*(\d{1,3}(?:\.\d{1,3}){3})', full_log)
+    if m:
+        return m.group(1)
+        
+    m = re.search(r"(\d{1,3}(?:\.\d{1,3}){3})", full_log)
     return m.group(1) if m else "?"
 
 def severity_badge(level):
@@ -168,7 +207,19 @@ def main():
     if not TOKEN or not CHAT_ID:
         sys.exit("TELEGRAM_TOKEN / TELEGRAM_CHAT_ID not set")
 
-    # Подготовка URL
+    # Пропускаем 651 (AR confirmation), так как это не атака, а следствие
+    rule_id = str(alert.get("rule", {}).get("id", ""))
+    if rule_id == "651":
+        print("[-] Skipping Active Response confirmation (651)")
+        sys.exit(0)
+
+    kind = classify(alert)
+    src_ip = extract_src_ip(alert)
+    
+    if is_spam(kind, src_ip):
+        print(f"[-] Suppressed duplicate alert for {kind} from {src_ip}")
+        sys.exit(0)
+
     if PROXY_URL:
         url = PROXY_URL.format(TOKEN, "sendMessage")
     else:
@@ -179,9 +230,8 @@ def main():
         "text": format_alert(alert),
         "disable_web_page_preview": True
     }
-
+    
     try:
-        # Используем requests вместо urllib
         r = requests.post(url, json=payload, timeout=15)
         r.raise_for_status()
         print("[+] Sent via requests")

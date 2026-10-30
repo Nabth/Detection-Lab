@@ -63,13 +63,14 @@
    <group>web_attack,ddos,active_response,</group>
   </rule>
 
-  <!-- Nginx Slowloris -->
-<rule id="100302" level="10">
-  <decoded_as>nginx-errorlog-timeout</decoded_as>
-  <description>Nginx: Slowloris Attack detected via error.log (client timeout from $(srcip))</description>
-  <mitre><id>T1498.001</id></mitre>
-  <group>web_attack,ddos,active_response,</group>
-</rule>
+  <!-- Nginx Log (Slowloris / Rate Limit) -->
+  <rule id="100302" level="10">
+    <if_sid>31301</if_sid>
+    <match>client timed out|limiting requests</match>
+    <description>Nginx: Slowloris Attack or Rate Limit Exceeded from $(srcip)</description>
+    <mitre><id>T1498.001</id></mitre>
+    <group>web_attack,ddos,active_response,</group>
+  </rule>
 </group>
 
 <!-- ================================================================== -->
