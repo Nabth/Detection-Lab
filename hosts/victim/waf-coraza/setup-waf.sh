@@ -33,6 +33,9 @@ chmod 644 certs/cert.pem
 docker run -d \
   --name coraza-waf \
   --restart unless-stopped \
+  --network waf-network \
+  --ip 172.28.0.2 \
+  --add-host=host.docker.internal:host-gateway \
   --group-add 2001 \
   -p 443:443 \
   -p 80:80 \
