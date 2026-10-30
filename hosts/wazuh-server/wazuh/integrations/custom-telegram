@@ -1,5 +1,6 @@
 #!/bin/sh
-WPYTHON_BIN="framework/python/bin/python3"
+# Use system python to avoid embedded python SSL/Cloudflare timeouts
+WPYTHON_BIN="/usr/bin/python3"
 SCRIPT_PATH_NAME="$0"
 DIR_NAME="$(cd $(dirname ${SCRIPT_PATH_NAME}); pwd -P)"
 SCRIPT_NAME="$(basename ${SCRIPT_PATH_NAME})"
@@ -11,4 +12,4 @@ case ${DIR_NAME} in
     PYTHON_SCRIPT="${DIR_NAME}/${SCRIPT_NAME}.py"
     ;;
 esac
-${WAZUH_PATH}/${WPYTHON_BIN} ${PYTHON_SCRIPT} "$@"
+${WPYTHON_BIN} ${PYTHON_SCRIPT} "$@"

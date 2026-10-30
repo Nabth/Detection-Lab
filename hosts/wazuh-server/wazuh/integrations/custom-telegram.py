@@ -1,14 +1,7 @@
 #!/usr/bin/env python3
 """
 SOC Lab notifier — Wazuh Integration for Telegram.
-
-Called by Wazuh Manager automatically via <integration> block in ossec.conf.
-Wazuh passes: argv = [script_name, alert_file_path, api_key, hook_url]
-
-Env (loaded from these paths):
-    TELEGRAM_TOKEN     — bot token
-    TELEGRAM_CHAT_ID   — target chat id
-    TELEGRAM_PROXY_URL — optional Cloudflare Worker
+Uses standard requests library for stable SSL/TLS connections.
 """
 import json
 import os
@@ -17,16 +10,16 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-import telebot
+import requests
 
-# --- env loading with quote stripping ---------------------------------------
+# --- env loading ---
 def _load_env(path: Path) -> None:
     try:
         if not path.exists():
             return
         content = path.read_text(encoding="utf-8")
     except (PermissionError, OSError):
-        return  # silently skip unreadable paths
+        return
     for line in content.splitlines():
         line = line.strip()
         if not line or line.startswith("#") or "=" not in line:
@@ -36,9 +29,9 @@ def _load_env(path: Path) -> None:
         os.environ.setdefault(k.strip(), v)
 
 for candidate in (
-    Path("/etc/soc-lab/telegram.env"),          # current location
-    Path("/var/ossec/etc/integrations.env"),    # Wazuh standard
-    Path.home() / "soc-detection-lab" / ".env", # project fallback
+    Path("/etc/soc-lab/telegram.env"),
+    Path("/var/ossec/etc/integrations.env"),
+    Path.home() / "soc-detection-lab" / ".env",
 ):
     _load_env(candidate)
 
@@ -46,10 +39,7 @@ TOKEN = os.getenv("TELEGRAM_TOKEN")
 CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 PROXY_URL = os.getenv("TELEGRAM_PROXY_URL")
 
-if PROXY_URL:
-    telebot.apihelper.API_URL = PROXY_URL
-
-# --- mappings ---------------------------------------------------------------
+# --- mappings ---
 CWE_MAP = {
     "sqli":  ("CWE-89",  "SQL Injection",             9.8),
     "xss":   ("CWE-79",  "Cross-Site Scripting",      6.1),
@@ -77,8 +67,7 @@ AR_RULES = {
 }
 
 AR_TIMEOUTS = {
-    "100203": 300,   # recon — 5 min
-    # все остальные из AR_RULES — 600s по умолчанию
+    "100203": 300,
 }
 
 def classify(a):
@@ -98,7 +87,6 @@ def classify(a):
         return "brute"
     return "other"
 
-
 def extract_src_ip(a):
     d = a.get("data", {}) or {}
     for k in ("srcip", "src_ip"):
@@ -113,13 +101,11 @@ def extract_src_ip(a):
     m = re.search(r"(\d{1,3}(?:\.\d{1,3}){3})", a.get("full_log", ""))
     return m.group(1) if m else "?"
 
-
 def severity_badge(level):
     if level >= 12: return "🚨 CRITICAL"
     if level >= 10: return "🔴 HIGH"
     if level >= 7:  return "🟠 MEDIUM"
     return "🟡 LOW"
-
 
 def format_alert(a):
     r = a.get("rule", {}) or {}
@@ -166,13 +152,9 @@ def format_alert(a):
     lines += ["", f"⏰ {ts}", f"👤 Agent: {agent}"]
     return "\n".join(lines)
 
-
 def main():
-    # Mode A: called manually (testing)
     if len(sys.argv) >= 3 and sys.argv[1] == "--alert-file":
         path = Path(sys.argv[2])
-    # Mode B: called by Wazuh Integration
-    # argv = [script, alert_file, api_key, hook_url]
     elif len(sys.argv) >= 2 and Path(sys.argv[1]).exists():
         path = Path(sys.argv[1])
     else:
@@ -186,13 +168,25 @@ def main():
     if not TOKEN or not CHAT_ID:
         sys.exit("TELEGRAM_TOKEN / TELEGRAM_CHAT_ID not set")
 
-    bot = telebot.TeleBot(TOKEN)
+    # Подготовка URL
+    if PROXY_URL:
+        url = PROXY_URL.format(TOKEN, "sendMessage")
+    else:
+        url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
+
+    payload = {
+        "chat_id": CHAT_ID,
+        "text": format_alert(alert),
+        "disable_web_page_preview": True
+    }
+
     try:
-        bot.send_message(CHAT_ID, format_alert(alert), disable_web_page_preview=True)
-        print("[+] Sent")
+        # Используем requests вместо urllib
+        r = requests.post(url, json=payload, timeout=15)
+        r.raise_for_status()
+        print("[+] Sent via requests")
     except Exception as e:
         sys.exit(f"Send failed: {e}")
-
 
 if __name__ == "__main__":
     main()
