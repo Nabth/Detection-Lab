@@ -56,12 +56,20 @@
 
   <!-- Nginx HTTP Flood (429 Too Many Requests) -->
 <rule id="100300" level="10">
-    <if_sid>31101</if_sid>
-    <id>429</id>
-    <description>Nginx: HTTP Flood detected (429 Too Many Requests) from $(srcip)</description>
-    <mitre><id>T1498.001</id></mitre>
-    <group>web_attack,ddos,active_response,</group>
+   <if_sid>31100</if_sid>
+   <id>429</id>
+   <description>Nginx: HTTP Flood detected (429 Too Many Requests) from $(srcip)</description>
+   <mitre><id>T1498.001</id></mitre>
+   <group>web_attack,ddos,active_response,</group>
   </rule>
+
+  <!-- Nginx Slowloris -->
+<rule id="100302" level="10">
+  <decoded_as>nginx-errorlog-timeout</decoded_as>
+  <description>Nginx: Slowloris Attack detected via error.log (client timeout from $(srcip))</description>
+  <mitre><id>T1498.001</id></mitre>
+  <group>web_attack,ddos,active_response,</group>
+</rule>
 </group>
 
 <!-- ================================================================== -->
