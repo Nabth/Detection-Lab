@@ -105,7 +105,7 @@
   </rule>
 
   <!-- Nmap Scans -->
-  <rule id="100203" level="7">
+  <rule id="100203" level="10">
     <if_sid>86601</if_sid>
     <regex>ET SCAN</regex>
     <description>Suricata: Port Scan detected.</description>

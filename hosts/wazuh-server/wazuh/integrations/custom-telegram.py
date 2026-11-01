@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 """
 SOC Lab notifier — Wazuh Integration for Telegram.
-Includes Alert Deduplication and filters out Active Response confirmations.
+Includes Alert Deduplication (by Attack Type & IP), URL decoding, and CWE mapping.
 """
 import json
 import os
 import re
 import sys
 import time
+import urllib.parse
 from datetime import datetime
 from pathlib import Path
 
@@ -42,12 +43,15 @@ PROXY_URL = os.getenv("TELEGRAM_PROXY_URL")
 
 # --- mappings ---
 CWE_MAP = {
-    "sqli":  ("CWE-89",  "SQL Injection",             9.8),
-    "xss":   ("CWE-79",  "Cross-Site Scripting",      6.1),
-    "ddos":  ("CWE-400", "Resource Exhaustion",       7.5),
-    "scan":  ("CWE-200", "Information Exposure",      5.3),
-    "brute": ("CWE-307", "Excessive Auth Attempts",   8.1),
-    "other": ("CWE-20",  "Improper Input Validation", 5.0),
+    "sqli":    ("CWE-89",  "SQL Injection",             9.8),
+    "xss":     ("CWE-79",  "Cross-Site Scripting",      6.1),
+    "cmdinj":  ("CWE-78",  "OS Command Injection",      9.8),
+    "lfi":     ("CWE-98",  "Local File Inclusion",      7.5),
+    "ddos_l3": ("CWE-400", "Network DDoS (L3/L4)",      7.5),
+    "ddos_l7": ("CWE-400", "HTTP Flood (L7)",           7.5),
+    "scan":    ("CWE-200", "Information Exposure",      5.3),
+    "brute":   ("CWE-307", "Excessive Auth Attempts",   8.1),
+    "other":   ("CWE-20",  "Improper Input Validation", 5.0),
 }
 
 MITRE_TEXT = {
@@ -76,6 +80,9 @@ CACHE_FILE = Path("/tmp/wazuh_tg_cache.json")
 COOLDOWN = 300  # 5 minutes
 
 def is_spam(kind, srcip):
+    if not srcip or srcip == "?":
+        return False
+
     if not CACHE_FILE.exists():
         CACHE_FILE.write_text("{}")
     try:
@@ -103,13 +110,21 @@ def classify(a):
     r = a.get("rule", {}) or {}
     g = [x.lower() for x in r.get("groups", [])]
     d = (r.get("description") or "").lower()
-    if "sql_injection" in g or "sql" in d:
+    uri = str(a.get("data", {}).get("url", "")) + str(a.get("full_log", ""))
+    uri = uri.lower()
+    
+    if "sql_injection" in g or "sql" in d or "union" in uri or "select" in uri:
         return "sqli"
-    if "xss" in g or "xss" in d or "cross-site" in d:
+    if "xss" in g or "xss" in d or "cross-site" in d or "<script>" in uri:
         return "xss"
-    if any(x in g for x in ("ddos", "syn_flood", "udp_flood", "icmp_flood",
-                             "ack_flood", "rst_flood")):
-        return "ddos"
+    if "whoami" in uri or "%3b" in uri or "cmd" in g or "shell" in uri:
+        return "cmdinj"
+    if "etc/passwd" in uri or "../" in uri or "lfi" in g:
+        return "lfi"
+    if any(x in g for x in ("syn_flood", "udp_flood", "icmp_flood", "ack_flood", "rst_flood", "ddos")) or "flood" in d:
+        if "nginx" in g or "web" in g or "429" in d:
+            return "ddos_l7"
+        return "ddos_l3"
     if any(x in g for x in ("scan", "port_scan", "tcp_anomaly")) or "scan" in d:
         return "scan"
     if any(x in g for x in ("brute_force", "authentication_failed")) or "brute" in d:
@@ -130,13 +145,9 @@ def extract_src_ip(a):
     
     full_log = a.get("full_log", "")
     m = re.search(r'"src_ip":"(\d{1,3}(?:\.\d{1,3}){3})"', full_log)
-    if m:
-        return m.group(1)
-        
+    if m: return m.group(1)
     m = re.search(r'client:\s*(\d{1,3}(?:\.\d{1,3}){3})', full_log)
-    if m:
-        return m.group(1)
-        
+    if m: return m.group(1)
     m = re.search(r"(\d{1,3}(?:\.\d{1,3}){3})", full_log)
     return m.group(1) if m else "?"
 
@@ -170,7 +181,9 @@ def format_alert(a):
         ts = ts_raw
 
     groups = [g.lower() for g in r.get("groups", [])]
-    desc = r.get("description", "")
+    
+    # Декодируем URL, чтобы убрать мусор вроде %3B и %3C
+    desc = urllib.parse.unquote(r.get("description", ""))
 
     lines = [
         f"{severity_badge(level)} | Wazuh L{level}",
@@ -207,7 +220,6 @@ def main():
     if not TOKEN or not CHAT_ID:
         sys.exit("TELEGRAM_TOKEN / TELEGRAM_CHAT_ID not set")
 
-    # Пропускаем 651 (AR confirmation), так как это не атака, а следствие
     rule_id = str(alert.get("rule", {}).get("id", ""))
     if rule_id == "651":
         print("[-] Skipping Active Response confirmation (651)")
@@ -216,7 +228,10 @@ def main():
     kind = classify(alert)
     src_ip = extract_src_ip(alert)
     
-    if is_spam(kind, src_ip):
+    # Для кэша объединяем ACK/SYN и HTTP Flood в один тип
+    cache_kind = "ddos" if kind in ("ddos_l3", "ddos_l7") else kind
+    
+    if is_spam(cache_kind, src_ip):
         print(f"[-] Suppressed duplicate alert for {kind} from {src_ip}")
         sys.exit(0)
 
