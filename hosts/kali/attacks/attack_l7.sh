@@ -5,9 +5,6 @@ TARGET_URL="${1:-https://192.168.56.20}"
 
 echo -e "\033[1;33m[*] Starting L7 Attacks against $TARGET_URL\033[0m"
 
-# =====================================================================
-# PHASE 1: Web Attacks (WAF blocks)
-# =====================================================================
 echo -e "\n\033[1;36m[PHASE 1] OWASP Top 10 & WAF Evasion\033[0m"
 
 echo "[+] SQL Injection (5 payloads)"
@@ -47,9 +44,6 @@ echo "[+] Custom WAF: SQLMap User-Agent"
 curl -k -s -o /dev/null -w "  Status: %{http_code}\n" -A "sqlmap/1.7.2#stable" "$TARGET_URL/"
 sleep 1
 
-# =====================================================================
-# PHASE 2: HTTP Flood (Banning Attack)
-# =====================================================================
 echo -e "\n\033[1;31m[PHASE 2] HTTP Flood (Triggers Active Response)\033[0m"
 echo "[!] WARNING: Your real IP (192.168.56.30) will be banned!"
 
