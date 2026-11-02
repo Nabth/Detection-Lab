@@ -1,14 +1,14 @@
 # Victim (192.168.56.20)
 
 ## Роль
-Защищаемый хост: IDS, WAF, уязвимое веб-приложение, Wazuh Agent.
+Защищаемый хост (Blue Team). На этой ВМ развернут многоуровневый периметр защиты, IDS, WAF и уязвимое приложение для приманки.
 
 ## Компоненты
-- **Suricata** — L3/L4 IDS (`suricata/`)
-- **WAF Coraza + Nginx** — L7 защита (`waf-coraza/`)
-- **Wazuh Agent** — отправка логов (`wazuh-agent/`)
-- **iptables + sysctl** — rate limiting и hardening (`network/`)
-- **DVWA** — уязвимое веб-приложение (`target-dvwa/`)
+*   **Suricata** (`suricata/`) — L3/L4 IDS. Настроен на пассивный анализ трафика. Включает `pass.rules` для игнорирования трафика Wazuh Server (защита от ложных срабатываний).
+*   **WAF Coraza + Nginx** (`waf-coraza/`) — L7 защита в Docker-контейнере. Обеспечивает терминацию TLS, rate limiting и инспекцию пейлоада (OWASP CRS).
+*   **Wazuh Agent** (`wazuh-agent/`) — Собирает логи со всех компонентов (Suricata, Nginx, WAF, системные логи) и отправляет на Manager.
+*   **Сетевая защита** (`network/`) — Скрипты `iptables-hardening.sh` (создание `CUSTOM_DDOS`) и `docker-isolation.sh` (изоляция Docker через `DOCKER-USER`).
+*   **DVWA** — Уязвимое веб-приложение (запущено на Apache/PHP, порт 8080).
 
 ## Развёртывание
-См. `docs/deployment.md`.
+Большая часть настроек автоматизирована скриптами в этой директории. Пошаговая инструкция (включая ручные шаги по настройке DVWA и UFW) описана в `docs/deployment.md`.

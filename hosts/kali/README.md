@@ -1,12 +1,15 @@
 # Kali Linux (192.168.56.30)
 
 ## Роль
-Машина атакующего для эмуляции угроз.
+Машина атакующего (Red Team) для эмуляции угроз и проверки правил детектирования SIEM.
 
-## Скрипты
-- `attacks/attack_sqli.sh` — SQL-инъекции (6 типов)
-- `attacks/attack_ddos.sh` — SYN/UDP/ICMP flood
-- `attacks/attack_owasp.sh` — XSS, Command Injection, IDOR
+## Скрипты атак
+Все скрипты лежат в папке `attacks/`. Они разделены на фазы для корректной работы с Active Response на защищаемом хосте.
+*   `attacks/run_all.sh` — Главный оркестратор. Запускает полную симуляцию (L3/L4 + L7) и управляет паузами для снятия банов IP.
+*   `attacks/attack_l34.sh` — Эмуляция DDoS (SYN, UDP, ICMP, ACK, RST) со спуфингом IP и сканирований портов (Nmap, XMAS, NULL).
+*   `attacks/attack_l7.sh` — Эмуляция веб-атак (SQLi, XSS, Command Injection, LFI) и HTTP Flood.
 
 ## Запуск
-Все скрипты запускаются на Kali, атакуют `victim` (192.168.56.20).
+1. Скопируйте скрипты на Kali (или запускайте прямо из репозитория).
+2. Выполните: `./attacks/run_all.sh`
+3. Следуйте инструкциям на экране (скрипт будет делать паузы, когда сработает защита на Victim).

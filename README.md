@@ -1,22 +1,22 @@
 # Detection Lab
 
-> Изолированная лаборатория для эмуляции атак и валидации детекта на трёх уровнях: сеть (L3/L4), веб-приложение (L7) и SIEM-корреляция. Собрана по паттерну «IDS + WAF + SIEM + автоматическое реагирование» (Defense in Depth), типичному для реальных SOC.
+![Wazuh OWASP](docs/images/wazuh_owasp.png) ![Telegram OWASP](docs/images/telegram_owasp.png)
+
+Изолированная лаборатория для эмуляции атак и валидации детекта. Архитектура реализует паттерн **Defense in Depth** и выстроена по цепочке: **Network IDS (L3/L4) → Web WAF + Reverse Proxy (L7) → SIEM → Active Response**.
 
 ![License](https://img.shields.io/badge/license-MIT-green)
-![Wazuh](https://img.shields.io/badge/Wazuh-4.14.9-blue)
 ![Suricata](https://img.shields.io/badge/Suricata-8.0.7-orange)
 ![Coraza](https://img.shields.io/badge/Coraza_CRS-4.30_PL1-red)
+![Nginx](https://img.shields.io/badge/Nginx-Reverse_Proxy-green)
+![Wazuh](https://img.shields.io/badge/Wazuh-4.14.9-blue)
 
 ---
 
-## 🎯 Ключевая идея
-Не просто развернуть инструменты, а **построить защиту, проверить её в бою** и честно задокументировать пробелы (Gap Analysis).
-
-## 🏗️ Архитектура
+## Архитектура
 
 ```mermaid
 flowchart LR
-    subgraph ATTACKER["🦹 Attacker (Kali · 192.168.56.30)"]
+    subgraph ATTACKER["🗡️ Attacker (Kali · 192.168.56.30)"]
         A1["hping3 · nmap · curl · sqlmap<br/>(с поддержкой спуфинга IP)"]
     end
 
@@ -51,19 +51,55 @@ flowchart LR
     WM -.->|"alert level >= 10"| TG
 ```
 
-## 📊 Покрытие детектирования (Detection Coverage)
+***
 
-| Атака | L3/L4 (iptables + Suricata) | L7 (WAF + Nginx) | SIEM (Wazuh) | Реакция (AR) | Статус |
-|:---|:---:|:---:|:---:|:---:|:---:|
-| **L3/L4 DDoS** (SYN/UDP/ICMP/ACK/RST) | ✅ Suricata Rules | — | `100200-100206` | ✅ 600s | 🟢 |
-| **Сканирования** (Nmap/XMAS/NULL) | ✅ Suricata + ET SCAN | — | `100203, 100207` | ✅ 300s/600s | 🟢 |
-| **OWASP Top 10** (SQLi, XSS, CmdInj) | — (TLS) | ✅ OWASP CRS | `100101, 100104` | — | 🟢 |
-| **HTTP Flood** (429) | — | ✅ Nginx limit_req | `100300` (access.log) | ✅ 600s | 🟢 |
-| **Slowloris / Timeout** | — | ✅ Nginx limit_conn | `100302` (error.log) | ✅ 600s | 🟡 (см. Gap) |
-| **SSH Brute Force** | — | — | `5760` (sshd) | Fail2Ban | 🟢 |
-| **TG Notifier** (Уведомления) | — | — | Wazuh Integration | — | 🟢 |
+## Detection Coverage Matrix
 
-## 🧰 Стек технологий
+Таблица показывает, какие слои защиты (iptables, Suricata, WAF, Nginx, Wazuh, Active Response) задействованы при отражении конкретных типов атак.
+
+### L3/L4 Атаки (Сеть и Транспорт)
+
+| Атака | iptables (Rate Limit) | Suricata (Rule ID) | Wazuh (Rule ID) | Active Response |
+|:---|:---:|:---:|:---:|:---:|
+| **SYN Flood** | ✅ 100 pps | ✅ `1000001` | `100200` | ✅ 600s |
+| **UDP Flood** | ✅ 200 pps | ✅ `1000002` | `100201` | ✅ 600s |
+| **ICMP Flood** | ✅ 10 pps | ✅ `1000009` | `100204` | ✅ 600s |
+| **ACK Flood** | ✅ 100 pps | ✅ `1000010` | `100205` | ✅ 600s |
+| **RST Flood** | ✅ 100 pps | ✅ `1000011` | `100206` | ✅ 600s |
+| **LAND Attack** | ✅ Drop | ✅ `1000012` | `100207` | ✅ 600s |
+| **Invalid Flags** | ✅ Drop | ✅ `1000013/14` | `100207` | ✅ 600s |
+
+### L4 Сканирования (Reconnaissance)
+
+| Атака | iptables | Suricata (Rule ID) | Wazuh (Rule ID) | Active Response |
+|:---|:---:|:---:|:---:|:---:|
+| **Nmap SYN Scan** | — | ✅ ET SCAN | `100203` | ✅ 300s |
+| **XMAS Scan** | ✅ Drop | ✅ `1000003` | `100202` | ✅ 600s |
+| **NULL Scan** | ✅ Drop | ✅ `1000004` | `100202` | ✅ 600s (Gap) |
+| **FIN Scan** | ✅ Drop | ✅ `1000005` | `100202` | ✅ 600s |
+
+### L7 Атаки (Веб-приложения)
+
+| Атака | WAF (Coraza/CRS) | Nginx (Rate Limit) | Wazuh (Rule ID) | Active Response |
+|:---|:---:|:---:|:---:|:---:|
+| **SQL Injection** | ✅ CRS 942100 | — | `100101, 100104` | — |
+| **XSS** | ✅ CRS 941100 | — | `100101` | — |
+| **Command Injection** | ✅ CRS 932100 | — | `100101` | — |
+| **LFI** | ✅ CRS 930100 | — | `100101` | — |
+| **SQLMap (UA)** | ✅ Custom 10004 | — | `100101` | — |
+| **HTTP Flood** | — | ✅ 429 Too Many | `100300` | ✅ 600s |
+| **Slowloris** | — | ✅ limit_conn | `100302` | ✅ 600s (Gap) |
+
+### Прочее
+
+| Атака | Защита | Wazuh (Rule ID) | Реакция |
+|:---|:---|:---:|:---|
+| **SSH Brute Force** | Fail2Ban (iptables) | `5760` (логи) | Fail2Ban (1 час) |
+| **Telegram Notifier** | Python Integration | — | Отправка алертов (Level 10+) |
+
+***
+
+## Стек технологий
 
 | Слой | Инструмент | Версия |
 |:---|:---|:---|
@@ -77,18 +113,18 @@ flowchart LR
 | Notifier | Python + pyTelegramBotAPI + Cloudflare Worker | — |
 | Attacker | hping3, nmap, sqlmap, hydra, slowhttptest | — |
 
-## 🚀 Быстрый старт
+## Быстрый старт
 
 1. **Развернуть 3 ВМ** — пошагово в [`docs/deployment.md`](docs/deployment.md).
 2. **Проверить стенд** — `sudo ./tooling/health_check.sh` (все сервисы должны быть alive).
 3. **Прогнать тесты** — `./hosts/kali/attacks/run_all.sh` (интерактивные скрипты атак).
 4. **Открыть Dashboard** — `https://192.168.56.10` (Wazuh UI).
 
-> ⚠️ Setup частично автоматизирован (`hosts/victim/network/*.sh`, `setup-waf.sh`), частично ручной (DVWA, Fail2Ban, UFW). **Точный split — в `docs/deployment.md`**.
+Setup частично автоматизирован (`hosts/victim/network/*.sh`, `setup-waf.sh`), частично ручной (DVWA, Fail2Ban, UFW). **Точный split — в `docs/deployment.md`**.
+
 
 ## ⚠️ Известные ограничения (Gap Analysis)
 
-Мы намеренно документируем слепые зоны, чтобы показать понимание архитектуры:
 1. **Slowloris (HTTP/2 Gap):** Nginx настроен на HTTP/2 и отбивает невалидные HTTP/1.1 заголовки кодом `400` до срабатывания таймаута.
 2. **Race Condition (L3 vs L7):** При HTTP Flood Suricata (L3) срабатывает быстрее и банит IP через Active Response, поэтому Nginx (L7) не успевает выдать 429.
 3. **Fail2Ban Integration:** Логи банов не парсятся Wazuh (нет нативного декодера), хотя попытки SSH-логина Wazuh видит.
@@ -96,26 +132,25 @@ flowchart LR
 
 Полный разбор → [`docs/gap-analysis.md`](docs/gap-analysis.md).
 
-## 📚 Документация
+## Документация и Доказательства
 
+*   [`docs/evidence.md`](docs/evidence.md) — **Доказательства работы (скриншоты Wazuh и Telegram).**
+*   [`docs/scripts.md`](docs/scripts.md) — Полный справочник всех скриптов и файлов.
 *   [`docs/architecture.md`](docs/architecture.md) — Потоки данных и Defense in Depth.
-*   [`docs/deployment.md`](docs/deployment.md) — Инструкция по развертыванию.
 *   [`docs/detection-rules.md`](docs/detection-rules.md) — Кастомные правила Suricata, Wazuh, WAF.
-*   [`docs/detection-matrix.md`](docs/detection-matrix.md) — Матрица покрытия атак.
 *   [`docs/hardening.md`](docs/hardening.md) — Настройки iptables, Nginx, Docker, UFW.
 *   [`docs/gap-analysis.md`](docs/gap-analysis.md) — Честный анализ ограничений.
 *   [`docs/troubleshooting.md`](docs/troubleshooting.md) — 20+ реальных проблем и их решения.
-*   [`docs/scripts.md`](docs/scripts.md) — Описание всех скриптов (Red Team, DevSecOps, Tooling).
+*   [`docs/deployment.md`](docs/deployment.md) — Инструкция по развертыванию.
 
-## 📂 Структура репозитория
+## Структура репозитория
 
 ```text
 ├── hosts/                  # Конфиги по машинам (Wazuh, Victim, Kali)
 ├── docs/                   # Полная документация
-├── testing/                # Bash test suite (run_tests.sh)
 ├── tooling/                # health_check, correlate, telegram_bot
 └── README.md
 ```
 
-## 📄 Лицензия
+## Лицензия
 [MIT](LICENSE)

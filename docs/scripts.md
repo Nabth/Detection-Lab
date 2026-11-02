@@ -1,70 +1,79 @@
-Scripts Reference: Скрипты и автоматизация
-В репозитории собраны скрипты для трех основных задач: эмуляция атак (Red Team), проверка работоспособности стенда (Blue Team/DevSecOps) и интеграция с внешними системами (Tooling).
+# Scripts Reference: Полный справочник скриптов и файлов
 
-🦹 Red Team: Скрипты атак (hosts/kali/attacks/)
-Запускаются на машине атакующего (Kali Linux). Предназначены для проверки правил детектирования и работы Active Response.
+В репозитории собраны файлы для настройки инфраструктуры, эмуляции атак и проверки состояния стенда. Документ структурирован по ролям (Red Team, Blue Team, SIEM и утилиты).
 
-Оркестратор run_all.sh
-Главный скрипт, запускающий полную симуляцию. Управляет паузами для снятия банов.
+## 1. Red Team: Эмуляция атак (`hosts/kali/`)
 
-PHASE 1 (L3/L4) — запускает attack_l34.sh. Использует спуфинг IP, чтобы проверить Suricata и Active Response, не блокируя реальный IP Kali.
+**Назначение:** Скрипты для проверки защиты. Запускаются на машине атакующего (Kali Linux).
+**Локальные файлы:**
+*   `README.md` — Краткое описание роли машины.
 
-PHASE 2 (L7) — запускает attack_l7.sh. Использует реальный IP (нужен для TCP). Скрипт делает паузы, когда срабатывает защита, и просит оператора разблокировать IP на Victim.
+**Скрипты атак:**
+*   `attacks/run_all.sh` — Оркестратор. Запускает полную симуляцию (L3/L4, затем L7). Управляет паузами для снятия банов.
+*   `attacks/attack_l34.sh` — Эмуляция DDoS (SYN, UDP, ICMP, ACK, RST) со спуфингом IP и сканирований (Nmap, XMAS, NULL).
+*   `attacks/attack_l7.sh` — Эмуляция веб-атак (SQLi, XSS, CMD, LFI, обфускация) и HTTP Flood.
 
-Сетевые атаки attack_l34.sh
-Эмулирует L3/L4 атаки. Для каждого вектора генерируется случайный IP-адрес.
+## 2. Blue Team: Защита и настройка (`hosts/victim/`)
 
-DDoS: SYN, UDP, ICMP, ACK, RST Flood (с контролем скорости -i u200, чтобы не перегрузить CPU VirtualBox).
+**Назначение:** Скрипты конфигурации защищаемого хоста (Victim).
+**Локальные файлы:**
+*   `README.md` — Описание компонентов Victim.
+*   `network/README.md` — Описание сетевых правил.
 
-Сканирования: Nmap SYN Scan (реальный IP), XMAS, NULL, Invalid Flags (спуфинг).
+**Сетевые скрипты:**
+*   `network/iptables-hardening.sh` — Создает цепочку `CUSTOM_DDOS` (rate limiting и блокировка невалидных TCP-флагов).
+*   `network/docker-isolation.sh` — Настраивает цепочку `DOCKER-USER` (изоляция WAF-контейнера от остальной сети).
+*   `setup-sync-time.sh` — Устанавливает NTP (chrony) для синхронизации времени.
 
-Примечание: NULL Scan может не детектироваться из-за отбрасывания пустых пакетов ядром (см. Gap Analysis).
+**Конфиги Suricata:**
+*   `suricata/custom.rules` — Кастомные правила детекта L3/L4.
+*   `suricata/pass.rules` — Whitelist (игнорирование IP Wazuh Server).
+*   `suricata/enable.conf` — Включение ET SCAN правил.
+*   `suricata/suricata.yaml` — Главный конфиг IDS.
 
-Веб-атаки attack_l7.sh
-Эмулирует атаки на уровне HTTP/HTTPS.
+**Конфиги WAF (Coraza + Nginx):**
+*   `waf-coraza/setup-waf.sh` — Скрипт запуска Docker-контейнера WAF.
+*   `waf-coraza/gen_certs.sh` — Генерация TLS-сертификатов.
+*   `waf-coraza/custom-nginx.conf` — Настройки rate-limit и security headers.
+*   `waf-coraza/override.conf` — Кастомные правила WAF.
 
-OWASP Top 10: SQLi (5 типов), XSS, Command Injection, LFI.
+**Конфиг агента:**
+*   `wazuh-agent/ossec.conf` — Настройка чтения логов.
 
-WAF Evasion: Обфускация SQLi (UNION/**/), Double URL Encoding (%2527), SQLMap User-Agent.
+## 3. SIEM: Правила и Интеграции (`hosts/wazuh-server/`)
 
-HTTP Flood: 60 параллельных запросов curl (вызывает 429 от Nginx и бан через Active Response).
+**Назначение:** Настройки Wazuh Manager и скрипты интеграции.
+**Локальные файлы:**
+*   `README.md` — Описание роли сервера.
 
-🛡️ Blue Team / DevSecOps: Проверка и тесты (tooling/, testing/)
-Запускаются на машине Victim для контроля состояния защищенного хоста.
+**Конфигурации менеджера:**
+*   `wazuh/manager/local_rules.xml` — Кастомные правила детектирования и Active Response.
+*   `wazuh/manager/ossec-manager.conf` — Главный конфиг (whitelist, AR, интеграции).
+*   `wazuh/manager/systemd-override.conf.example` — Шаблон для переменных окружения.
+*   `wazuh/decoders/local_decoder.xml` — Декодеры JSON-логов.
 
-Проверка здоровья tooling/health_check.sh
-Скрипт проверяет доступность 7 ключевых компонентов. Запускается с sudo.
+**Интеграция с Telegram:**
+*   `wazuh/integrations/custom-telegram` — Shell-обертка (запускает системный Python).
+*   `wazuh/integrations/custom-telegram.py` — Python-скрипт (форматирование, дедупликация, отправка).
 
-WAF (HTTPS 443)
+## 4. Tooling: DevSecOps утилиты (`tooling/`)
 
-Apache/DVWA (HTTP 8080)
+**Назначение:** Вспомогательные скрипты для администратора стенда.
+*   `health_check.sh` — Проверяет доступность 7 ключевых сервисов.
+*   `reset_lab.sh` — Сбрасывает состояние стенда (снимает баны, перезапускает сервисы).
+*   `correlate.sh` — Строит временной таймлайн атак по конкретному IP.
+*   `flatten_json.py` — Преобразует вложенные JSON-логи в плоский CSV/TSV.
+*   `requirements.txt` — Зависимости Python.
 
-Suricata service
+## 5. Документация (`docs/`)
 
-Wazuh Agent service
-
-Docker container (coraza-waf)
-
-iptables CUSTOM_DDOS chain
-
-Fail2Ban service
-
-Регрессионные тесты testing/run_tests.sh
-Быстрая проверка 5 базовых сценариев защиты:
-
-SQL Injection (403): WAF блокирует id=1' OR '1'='1.
-
-XSS (403): WAF блокирует <script>alert(1)</script>.
-
-Suricata (Nmap): Запускает nmap -sS и ищет алерт ET SCAN.
-
-Nginx Rate Limiting (429): Отправляет 60 запросов и ждет сработку limit_req.
-
-Wazuh (Алерты): Проверяет, что события появились в alerts.json.
-
-🔧 Tooling: Интеграции и утилиты (tooling/)
-custom-telegram.py: Скрипт для Wazuh Integration. Форматирует алерты (CWE, CVSS, MITRE), использует дедупликацию (Anti-Spam Cache) и отправляет уведомления в Telegram через Cloudflare Worker.
-
-correlate.sh: Утилита для выгрузки таймлайна атак по конкретному IP-адресу из логов Wazuh.
-
-flatten_json.py: Утилита для преобразования сложных JSON-логов Suricata/Coraza в плоский CSV/TSV формат (удобно для анализа в Excel).
+*   `architecture.md` — Схема потоков данных и Defense in Depth.
+*   `deployment.md` — Пошаговая инструкция по развертыванию.
+*   `detection-rules.md` — Справочник правил Suricata, Wazuh, WAF.
+*   `hardening.md` — Описание настроек iptables, Nginx, Docker, UFW.
+*   `gap-analysis.md` — Честный анализ ограничений стенда.
+*   `troubleshooting.md` — 20+ реальных проблем и их решения.
+*   `testing.md` — Описание Health Check и процесса верификации.
+*   `evidence.md` — Визуальные доказательства работы (скриншоты).
+*   `scripts.md` — Этот справочник.
+*   `images/` — Папка со скриншотами.
