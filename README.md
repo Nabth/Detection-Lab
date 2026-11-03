@@ -1,7 +1,5 @@
 # Detection Lab
 
-![Wazuh OWASP](docs/images/wazuh_owasp.png) ![Telegram OWASP](docs/images/telegram_owasp.png)
-
 Изолированная лаборатория для эмуляции атак и валидации детекта. Архитектура реализует паттерн **Defense in Depth** и выстроена по цепочке: **Network IDS (L3/L4) → Web WAF + Reverse Proxy (L7) → SIEM → Active Response**.
 
 ![License](https://img.shields.io/badge/license-MIT-green)
@@ -10,7 +8,7 @@
 ![Nginx](https://img.shields.io/badge/Nginx-Reverse_Proxy-green)
 ![Wazuh](https://img.shields.io/badge/Wazuh-4.14.9-blue)
 
----
+![Wazuh OWASP](docs/images/wazuh_owasp.png) ![Telegram OWASP](docs/images/telegram_owasp.png)
 
 ## Архитектура
 
